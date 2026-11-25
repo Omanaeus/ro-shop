@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>จัดการร้าน RO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;700&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.top{background:var(--sky);color:#fff;padding-block:18px}
+.top .wrap{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.top h1{margin:0;font-size:28px;line-height:1.1}
+.top a{color:#fff}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.panel h2{margin:0 0 12px;font-size:22px;font-weight:500}
+.drop{border:2px dashed var(--sky);border-radius:14px;padding:22px 16px;text-align:center;cursor:pointer;background:var(--bg);display:grid;gap:6px;place-items:center;min-height:150px}
+.drop.over{background:color-mix(in srgb,var(--sky) 14%,var(--bg))}
+.drop img{max-height:240px;border-radius:8px}
+.drop small{color:var(--soft)}
+.status{font-size:15px;margin:10px 0 0;min-height:1.5em}
+.status.ok{color:var(--ok)}.status.bad{color:var(--bad)}
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.form label{display:grid;gap:4px;font-size:14px;color:var(--soft)}
+.form .full{grid-column:1/-1}
+.form input,.form select,.form textarea{width:100%;color:var(--ink)}
+.check{display:flex!important;align-items:center;gap:8px;grid-template-columns:none}
+.check input{width:20px!important;height:20px;min-height:0}
+.raw{font-size:13px;color:var(--soft);margin-top:10px}
+.raw pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;max-height:160px;overflow:auto}
+.list{display:grid;gap:10px}
+.li{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:6px 12px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px}
+.li .ico{width:44px;height:44px;grid-row:span 2}
+.li .ico svg{width:30px;height:30px}
+.li .nm{font-weight:600}
+.li .pr{color:var(--gold-ink);font-family:Kanit,sans-serif;white-space:nowrap}
+.li .ctl{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.li .ctl input{width:8.5em;min-height:36px;padding:6px 10px}
+.li .ctl select{min-height:36px;padding:6px 10px}
+.li.hidden-row{opacity:.55}
+.btn.danger{background:transparent;border:1.5px solid var(--bad);color:var(--bad)}
+.login{max-width:460px;margin:0 auto}
+.login input{width:100%;margin:8px 0 12px}
+@media(max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:480px){.form{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<header class="band top">
+  <div class="wrap"><h1>จัดการร้าน</h1><a href="./">ดูหน้าร้าน →</a></div>
+</header>
+
+<main class="band">
+  <div class="wrap">
+    <section id="login" class="panel login" hidden>
+      <h2>เข้าสู่หน้าแอดมิน</h2>
+      <p style="margin:0;color:var(--soft)">ใส่รหัส ADMIN_KEY ที่ได้จากการรัน setup() ใน Apps Script</p>
+      <label for="key" class="vh">รหัสแอดมิน</label>
+      <input id="key" type="password" autocomplete="current-password" placeholder="รหัสแอดมิน">
+      <button class="btn" id="login-btn" type="button">เข้าสู่ระบบ</button>
+      <p class="status" id="login-status"></p>
+    </section>
+
+    <div id="app" class="cols" hidden>
+      <section class="panel">
+        <h2>เพิ่มของจากรูป</h2>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="เลือกรูป screenshot">
+          <span id="drop-text"><b>วางรูป (Ctrl+V)</b> ลากรูปมาวาง หรือกดเพื่อเลือกไฟล์</span>
+          <small>ครอปให้เห็นแค่หน้าต่างรายละเอียดไอเทม จะอ่านได้แม่นที่สุด</small>
+          <img id="preview" alt="รูปที่เลือก" hidden>
+        </div>
+        <input id="file" type="file" accept="image/*" hidden>
+        <p class="status" id="ocr-status"></p>
+
+        <form class="form" id="form" autocomplete="off">
+          <label class="full">ชื่อไอเทม<input id="f-name" required placeholder="เช่น Blade [4]"></label>
+          <label>หมวด<select id="f-cat"></select></label>
+          <label>ตีบวก (+)<input id="f-refine" type="number" min="0" max="20" value="0" inputmode="numeric"></label>
+          <label>ราคา<input id="f-price" required placeholder="เช่น 450k หรือ 450000" inputmode="decimal"></label>
+          <label>หน่วย<select id="f-cur"><option value="z">Zeny</option><option value="฿">บาท</option></select></label>
+          <label>จำนวน<input id="f-qty" type="number" min="1" value="1" inputmode="numeric"></label>
+          <label>สถานะ<select id="f-status"><option value="on">พร้อมขาย</option><option value="hidden">ซ่อนไว้ก่อน</option></select></label>
+          <label class="full">หมายเหตุ<input id="f-note" placeholder="เช่น ATK +20, ซื้อ 10 ชิ้นลด 5%"></label>
+          <label class="full check"><input id="f-img" type="checkbox" checked> แนบรูปนี้ในประกาศ</label>
+          <div class="full acts" style="justify-content:flex-start">
+            <button class="btn" id="add-btn" type="submit">เพิ่มสินค้า</button>
+            <button class="btn ghost" id="reset-btn" type="button">ล้างฟอร์ม</button>
+          </div>
+          <p class="status full" id="add-status"></p>
+        </form>
+        <details class="raw" id="raw-box" hidden><summary>ข้อความที่อ่านได้จากรูป</summary><pre id="raw"></pre></details>
+      </section>
+
+      <section class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <h2 style="margin:0">ของในร้าน <span id="n" style="color:var(--soft);font-size:16px"></span></h2>
+          <div style="display:flex;gap:8px"><button class="btn ghost small" id="reload" type="button">รีเฟรช</button><button class="btn ghost small" id="logout" type="button">ออกจากระบบ</button></div>
+        </div>
+        <p class="status" id="list-status"></p>
+        <div class="list" id="list"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script src="parse.js"></script>
+<script>
+{
+const { CATS, ICON, esc, fmt, fullName, parsePrice, api } = RO;
+const $ = s => document.querySelector(s);
+const TESS = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+let KEY = "", ITEMS = [], imageData = "", worker = null, confirmDel = null;
+
+const store = { get: k => { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (_) {} } };
+const say = (el, msg, kind) => { el.textContent = msg || ""; el.className = "status" + (kind ? " " + kind : "") + (el.classList.contains("full") ? " full" : ""); };
+
+$("#f-cat").innerHTML = CATS.map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
+
+/* ---------- login ---------- */
+async function login(k) {
+  say($("#login-status"), "กำลังตรวจสอบ…");
+  try {
+    await api({ key: k, action: "check" });
+    KEY = k; store.set("ro-admin-key", k);
+    $("#login").hidden = true; $("#app").hidden = false;
+    loadList();
+  } catch (e) {
+    store.set("ro-admin-key", "");
+    $("#login").hidden = false; $("#app").hidden = true;
+    say($("#login-status"), e.message, "bad");
+  }
+}
+$("#login-btn").addEventListener("click", () => login($("#key").value.trim()));
+$("#key").addEventListener("keydown", e => { if (e.key === "Enter") login($("#key").value.trim()); });
+$("#logout").addEventListener("click", () => { store.set("ro-admin-key", ""); location.reload(); });
+
+/* ---------- image + OCR ---------- */
+function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => no(new Error("โหลดตัวอ่านรูปไม่สำเร็จ")); document.head.appendChild(s); }); }
+function readImage(file) { return new Promise((ok, no) => { const img = new Image(); img.onload = () => ok(img); img.onerror = () => no(new Error("เปิดรูปไม่ได้")); img.src = URL.createObjectURL(file); }); }
+
+// ย่อรูปสำหรับแนบในประกาศ (กว้างสุด 900px, JPEG)
+function toJpeg(img) {
+  const s = Math.min(1, 900 / img.naturalWidth), c = document.createElement("canvas");
+  c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85);
+}
+// เตรียมรูปให้ OCR อ่านง่าย: ขยาย 2 เท่า, ขาวดำ, กลับสีถ้าพื้นมืด
+function forOcr(img) {
+  const s = Math.min(2, 2400 / img.naturalWidth), c = document.createElement("canvas");
+  c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+  const g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(img, 0, 0, c.width, c.height);
+  const d = g.getImageData(0, 0, c.width, c.height), p = d.data; let sum = 0;
+  for (let i = 0; i < p.length; i += 4) { const y = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]; p[i] = p[i + 1] = p[i + 2] = y; sum += y; }
+  if (sum / (p.length / 4) < 110) for (let i = 0; i < p.length; i += 4) p[i] = p[i + 1] = p[i + 2] = 255 - p[i];
+  g.putImageData(d, 0, 0); return c;
+}
+
+async function handleFile(file) {
+  if (!file || !/^image\//.test(file.type)) return say($("#ocr-status"), "ต้องเป็นไฟล์รูปเท่านั้น", "bad");
+  try {
+    const img = await readImage(file);
+    imageData = toJpeg(img);
+    $("#preview").src = imageData; $("#preview").hidden = false; $("#drop-text").hidden = true;
+    say($("#ocr-status"), "กำลังอ่านข้อความในรูป… (ครั้งแรกอาจใช้เวลา 10–20 วินาที)");
+    if (!window.Tesseract) await loadScript(TESS);
+    if (!worker) worker = await Tesseract.createWorker("eng");
+    const { data } = await worker.recognize(forOcr(img));
+    const r = parseItemText(data.text);
+    $("#raw").textContent = r.raw.join("\n"); $("#raw-box").hidden = false;
+    if (r.name) $("#f-name").value = r.name;
+    $("#f-refine").value = r.refine; $("#f-cat").value = r.cat; $("#f-qty").value = r.qty;
+    if (r.note && !$("#f-note").value) $("#f-note").value = r.note;
+    say($("#ocr-status"), r.name ? "อ่านได้แล้ว ตรวจชื่อให้ถูก ใส่ราคา แล้วกดเพิ่มสินค้า" : "อ่านชื่อไม่ออก พิมพ์ชื่อเองได้เลย", r.name ? "ok" : "bad");
+    $("#f-price").focus();
+  } catch (e) { say($("#ocr-status"), e.message, "bad"); }
+}
+const drop = $("#drop");
+drop.addEventListener("click", () => $("#file").click());
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("#file").click(); } });
+$("#file").addEventListener("change", e => handleFile(e.target.files[0]));
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); handleFile(e.dataTransfer.files[0]); });
+document.addEventListener("paste", e => { if ($("#app").hidden) return; const f = [...(e.clipboardData?.files || [])].find(f => /^image\//.test(f.type)); if (f) { e.preventDefault(); handleFile(f); } });
+
+function resetForm() {
+  $("#form").reset(); imageData = ""; $("#preview").hidden = true; $("#drop-text").hidden = false;
+  $("#raw-box").hidden = true; say($("#ocr-status"), ""); $("#file").value = "";
+}
+$("#reset-btn").addEventListener("click", () => { resetForm(); say($("#add-status"), ""); });
+
+$("#form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const price = parsePrice($("#f-price").value);
+  if (!$("#f-name").value.trim()) return say($("#add-status"), "ใส่ชื่อไอเทมก่อนครับ", "bad");
+  if (!(price >= 0)) return say($("#add-status"), "ราคาไม่ถูกต้อง ใส่แบบ 450k หรือ 450000", "bad");
+  const item = { name: $("#f-name").value.trim(), cat: $("#f-cat").value, refine: +$("#f-refine").value || 0, price, cur: $("#f-cur").value, qty: +$("#f-qty").value || 1, status: $("#f-status").value, note: $("#f-note").value.trim() };
+  $("#add-btn").disabled = true; say($("#add-status"), "กำลังบันทึก…");
+  try {
+    const r = await api({ key: KEY, action: "add", item, image: $("#f-img").checked ? imageData : "" });
+    ITEMS.unshift(r.item); renderList();
+    say($("#add-status"), "เพิ่ม " + fullName(r.item) + " แล้ว ✓", "ok"); resetForm();
+  } catch (err) { say($("#add-status"), err.message, "bad"); }
+  $("#add-btn").disabled = false;
+});
+
+/* ---------- list ---------- */
+async function loadList() {
+  say($("#list-status"), "กำลังโหลด…");
+  try { const r = await api({ key: KEY, action: "list" }); ITEMS = r.items.reverse(); renderList(); say($("#list-status"), ""); }
+  catch (e) { say($("#list-status"), e.message, "bad"); }
+}
+function renderList() {
+  $("#n").textContent = "(" + ITEMS.length + ")";
+  $("#list").innerHTML = ITEMS.length ? ITEMS.map(i => `<div class="li${i.status === "hidden" ? " hidden-row" : ""}" data-id="${esc(i.id)}">
+    <div class="ico">${ICON[i.cat] || ICON.use}</div>
+    <div class="nm">${esc(fullName(i))} <span style="color:var(--soft);font-weight:400">×${esc(i.qty)}</span></div>
+    <div class="pr">${esc(fmt(i.price, i.cur))}</div>
+    <div class="ctl">
+      <label class="vh" for="p-${esc(i.id)}">ราคาใหม่</label>
+      <input id="p-${esc(i.id)}" data-f="price" placeholder="ราคาใหม่" inputmode="decimal">
+      <label class="vh" for="s-${esc(i.id)}">สถานะ</label>
+      <select id="s-${esc(i.id)}" data-f="status">${[["on", "พร้อมขาย"], ["sold", "ขายแล้ว"], ["hidden", "ซ่อน"]].map(([v, l]) => `<option value="${v}"${i.status === v ? " selected" : ""}>${l}</option>`).join("")}</select>
+      <button class="btn small" type="button" data-act="save">บันทึก</button>
+      <button class="btn danger small" type="button" data-act="del">${confirmDel === i.id ? "ยืนยันลบ?" : "ลบ"}</button>
+    </div>
+  </div>`).join("") : `<div class="empty">ยังไม่มีของในร้าน เริ่มเพิ่มจากรูปทางซ้ายได้เลย</div>`;
+}
+$("#list").addEventListener("click", async e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const row = b.closest(".li"), id = row.dataset.id;
+  try {
+    if (b.dataset.act === "del") {
+      if (confirmDel !== id) { confirmDel = id; renderList(); return; }
+      b.disabled = true; await api({ key: KEY, action: "delete", id });
+      ITEMS = ITEMS.filter(i => i.id !== id); confirmDel = null; renderList(); say($("#list-status"), "ลบแล้ว ✓", "ok");
+    } else {
+      const patch = { status: row.querySelector('[data-f="status"]').value };
+      const pv = row.querySelector('[data-f="price"]').value.trim();
+      if (pv) { const p = parsePrice(pv); if (!(p >= 0)) return say($("#list-status"), "ราคาไม่ถูกต้อง", "bad"); patch.price = p; }
+      b.disabled = true; const r = await api({ key: KEY, action: "update", id, patch });
+      ITEMS = ITEMS.map(i => i.id === id ? r.item : i); renderList(); say($("#list-status"), "บันทึก " + fullName(r.item) + " แล้ว ✓", "ok");
+    }
+  } catch (err) { b.disabled = false; say($("#list-status"), err.message, "bad"); }
+});
+$("#reload").addEventListener("click", loadList);
+
+/* ---------- start ---------- */
+if (!window.API_URL) { $("#login").hidden = false; say($("#login-status"), "ยังไม่ได้ใส่ API_URL ใน config.js (ดู README ขั้นที่ 3)", "bad"); $("#login-btn").disabled = true; }
+else if (store.get("ro-admin-key")) login(store.get("ro-admin-key"));
+else $("#login").hidden = false;
+}
+</script>
+</body>
+</html>
