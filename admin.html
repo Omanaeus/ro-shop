@@ -29,6 +29,14 @@
 .form input,.form select,.form textarea{width:100%;color:var(--ink)}
 .check{display:flex!important;align-items:center;gap:8px;grid-template-columns:none}
 .check input{width:20px!important;height:20px;min-height:0}
+.optprev{margin:-4px 0 0;font-size:13px;color:var(--soft)}
+.optprev b{color:var(--gold-ink);font-weight:600}
+.li .op{grid-column:2/-1;font-size:13px;color:var(--soft)}
+.li details{grid-column:2/-1;font-size:13px}
+.li details textarea{width:100%;min-height:70px;margin:6px 0}
+.li.resv-row{border-color:#b8893c;box-shadow:inset 3px 0 0 #f2b230}
+.rv{grid-column:2/-1;font-size:13px;color:var(--gold-ink);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ctl .by{width:9em}
 .raw{font-size:13px;color:var(--soft);margin-top:10px}
 .raw pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;max-height:160px;overflow:auto}
 .list{display:grid;gap:10px}
@@ -83,7 +91,9 @@
           <label>หน่วย<select id="f-cur"><option value="z">Zeny</option><option value="฿">บาท</option></select></label>
           <label>จำนวน<input id="f-qty" type="number" min="1" value="1" inputmode="numeric"></label>
           <label>สถานะ<select id="f-status"><option value="on">พร้อมขาย</option><option value="hidden">ซ่อนไว้ก่อน</option></select></label>
-          <label class="full">หมายเหตุ<input id="f-note" placeholder="เช่น ATK +20, ซื้อ 10 ชิ้นลด 5%"></label>
+          <label class="full">หมายเหตุ<input id="f-note" placeholder="เช่น ซื้อ 10 ชิ้นลด 5%"></label>
+          <label class="full">ออปชัน (บรรทัดละ 1 ออปชัน ระบบอ่านจากรูปให้ แก้ได้)<textarea id="f-opts" rows="4" placeholder="ATK +55&#10;ASPD +3&#10;Phys Damage to Demi-Human monsters +40%"></textarea></label>
+          <p class="full optprev" id="opts-prev"></p>
           <label class="full check"><input id="f-img" type="checkbox" checked> แนบรูปนี้ในประกาศ</label>
           <div class="full acts" style="justify-content:flex-start">
             <button class="btn" id="add-btn" type="submit">เพิ่มสินค้า</button>
@@ -99,6 +109,7 @@
           <h2 style="margin:0">ของในร้าน <span id="n" style="color:var(--soft);font-size:16px"></span></h2>
           <div style="display:flex;gap:8px"><button class="btn ghost small" id="reload" type="button">รีเฟรช</button><button class="btn ghost small" id="logout" type="button">ออกจากระบบ</button></div>
         </div>
+        <div class="chips" id="tabs" style="margin-bottom:10px"></div>
         <p class="status" id="list-status"></p>
         <div class="list" id="list"></div>
       </section>
@@ -109,12 +120,15 @@
 <script src="config.js"></script>
 <script src="common.js"></script>
 <script src="parse.js"></script>
+<script src="affixes.js"></script>
+<script src="calc-core.js"></script>
+<script src="opts.js"></script>
 <script>
 {
 const { CATS, ICON, esc, fmt, fullName, parsePrice, api } = RO;
 const $ = s => document.querySelector(s);
 const TESS = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
-let KEY = "", ITEMS = [], imageData = "", worker = null, confirmDel = null;
+let TAB = "all", KEY = "", ITEMS = [], imageData = "", worker = null, confirmDel = null;
 
 const store = { get: k => { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (_) {} } };
 const say = (el, msg, kind) => { el.textContent = msg || ""; el.className = "status" + (kind ? " " + kind : "") + (el.classList.contains("full") ? " full" : ""); };
@@ -138,6 +152,15 @@ async function login(k) {
 $("#login-btn").addEventListener("click", () => login($("#key").value.trim()));
 $("#key").addEventListener("keydown", e => { if (e.key === "Enter") login($("#key").value.trim()); });
 $("#logout").addEventListener("click", () => { store.set("ro-admin-key", ""); location.reload(); });
+
+/* ---------- options ---------- */
+function optPreview() {
+  const txt = $("#f-opts").value.trim();
+  if (!txt) { $("#opts-prev").textContent = ""; return; }
+  const r = OPTS.parse(txt);
+  $("#opts-prev").innerHTML = r.opts.length ? `อ่านได้ ${r.opts.length} ออปชัน (${esc(OPTS.TYPE_LABEL[r.type] || r.type)}): ` + r.opts.map(o => `<b>${esc(OPTS.fmt(o))}</b>`).join(" · ") : "ยังอ่านออปชันไม่ได้ ลองพิมพ์ชื่อให้ตรงกับในเกม";
+}
+$("#f-opts").addEventListener("input", optPreview);
 
 /* ---------- image + OCR ---------- */
 function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => no(new Error("โหลดตัวอ่านรูปไม่สำเร็จ")); document.head.appendChild(s); }); }
@@ -175,7 +198,10 @@ async function handleFile(file) {
     $("#raw").textContent = r.raw.join("\n"); $("#raw-box").hidden = false;
     if (r.name) $("#f-name").value = r.name;
     $("#f-refine").value = r.refine; $("#f-cat").value = r.cat; $("#f-qty").value = r.qty;
-    if (r.note && !$("#f-note").value) $("#f-note").value = r.note;
+    const po = OPTS.parse(data.text);
+    if (po.opts.length) { $("#f-opts").value = po.opts.map(OPTS.fmt).join("\n"); if (po.type) $("#f-cat").value = po.type === "forge" ? "weapon" : "armor"; }
+    else if (r.note && !$("#f-note").value) $("#f-note").value = r.note;
+    optPreview();
     say($("#ocr-status"), r.name ? "อ่านได้แล้ว ตรวจชื่อให้ถูก ใส่ราคา แล้วกดเพิ่มสินค้า" : "อ่านชื่อไม่ออก พิมพ์ชื่อเองได้เลย", r.name ? "ok" : "bad");
     $("#f-price").focus();
   } catch (e) { say($("#ocr-status"), e.message, "bad"); }
@@ -191,7 +217,7 @@ document.addEventListener("paste", e => { if ($("#app").hidden) return; const f 
 
 function resetForm() {
   $("#form").reset(); imageData = ""; $("#preview").hidden = true; $("#drop-text").hidden = false;
-  $("#raw-box").hidden = true; say($("#ocr-status"), ""); $("#file").value = "";
+  $("#raw-box").hidden = true; say($("#ocr-status"), ""); $("#file").value = ""; optPreview();
 }
 $("#reset-btn").addEventListener("click", () => { resetForm(); say($("#add-status"), ""); });
 
@@ -200,7 +226,7 @@ $("#form").addEventListener("submit", async e => {
   const price = parsePrice($("#f-price").value);
   if (!$("#f-name").value.trim()) return say($("#add-status"), "ใส่ชื่อไอเทมก่อนครับ", "bad");
   if (!(price >= 0)) return say($("#add-status"), "ราคาไม่ถูกต้อง ใส่แบบ 450k หรือ 450000", "bad");
-  const item = { name: $("#f-name").value.trim(), cat: $("#f-cat").value, refine: +$("#f-refine").value || 0, price, cur: $("#f-cur").value, qty: +$("#f-qty").value || 1, status: $("#f-status").value, note: $("#f-note").value.trim() };
+  const item = { name: $("#f-name").value.trim(), cat: $("#f-cat").value, refine: +$("#f-refine").value || 0, price, cur: $("#f-cur").value, qty: +$("#f-qty").value || 1, status: $("#f-status").value, note: $("#f-note").value.trim(), opts: OPTS.parse($("#f-opts").value).opts };
   $("#add-btn").disabled = true; say($("#add-status"), "กำลังบันทึก…");
   try {
     const r = await api({ key: KEY, action: "add", item, image: $("#f-img").checked ? imageData : "" });
@@ -216,36 +242,61 @@ async function loadList() {
   try { const r = await api({ key: KEY, action: "list" }); ITEMS = r.items.reverse(); renderList(); say($("#list-status"), ""); }
   catch (e) { say($("#list-status"), e.message, "bad"); }
 }
+const ST = [["on", "พร้อมขาย"], ["reserved", "ติดจอง"], ["sold", "ขายแล้ว"], ["hidden", "ซ่อน"]];
+const ago = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); };
 function renderList() {
   $("#n").textContent = "(" + ITEMS.length + ")";
-  $("#list").innerHTML = ITEMS.length ? ITEMS.map(i => `<div class="li${i.status === "hidden" ? " hidden-row" : ""}" data-id="${esc(i.id)}">
+  const nR = ITEMS.filter(i => i.status === "reserved").length;
+  $("#tabs").innerHTML = [["all", "ทั้งหมด " + ITEMS.length], ["reserved", "ติดจอง " + nR], ["on", "พร้อมขาย " + ITEMS.filter(i => i.status === "on").length], ["sold", "ขายแล้ว " + ITEMS.filter(i => i.status === "sold").length]]
+    .map(([k, l]) => `<button type="button" class="chip" data-tab="${k}" aria-pressed="${TAB === k}">${l}</button>`).join("");
+  const list = ITEMS.filter(i => TAB === "all" || i.status === TAB);
+  $("#list").innerHTML = list.length ? list.map(i => `<div class="li${i.status === "hidden" ? " hidden-row" : ""}${i.status === "reserved" ? " resv-row" : ""}" data-id="${esc(i.id)}">
     <div class="ico">${ICON[i.cat] || ICON.use}</div>
     <div class="nm">${esc(fullName(i))} <span style="color:var(--soft);font-weight:400">×${esc(i.qty)}</span></div>
     <div class="pr">${esc(fmt(i.price, i.cur))}</div>
+    ${i.status === "reserved" ? `<div class="rv">🔖 ติดจอง${i.resv && i.resv.by ? " โดย <b>" + esc(i.resv.by) + "</b>" : ""}${i.resv && i.resv.at ? " · " + esc(ago(i.resv.at)) : ""}
+      <button class="btn ghost small" type="button" data-act="unresv">ยกเลิกจอง (กลับมาขาย)</button><button class="btn small" type="button" data-act="soldnow">ขายแล้ว</button></div>` : ""}
+    ${(i.opts || []).length ? `<div class="op">${i.opts.map(o => esc(OPTS.fmt(o))).join(" · ")}</div>` : ""}
+    <details><summary>แก้ออปชัน</summary><textarea data-f="opts" aria-label="ออปชันของ ${esc(i.name)}">${esc((i.opts || []).map(OPTS.fmt).join("\n"))}</textarea><button class="btn small" type="button" data-act="opts">บันทึกออปชัน</button></details>
     <div class="ctl">
       <label class="vh" for="p-${esc(i.id)}">ราคาใหม่</label>
       <input id="p-${esc(i.id)}" data-f="price" placeholder="ราคาใหม่" inputmode="decimal">
       <label class="vh" for="s-${esc(i.id)}">สถานะ</label>
-      <select id="s-${esc(i.id)}" data-f="status">${[["on", "พร้อมขาย"], ["sold", "ขายแล้ว"], ["hidden", "ซ่อน"]].map(([v, l]) => `<option value="${v}"${i.status === v ? " selected" : ""}>${l}</option>`).join("")}</select>
+      <select id="s-${esc(i.id)}" data-f="status">${ST.map(([v, l]) => `<option value="${v}"${i.status === v ? " selected" : ""}>${l}</option>`).join("")}</select>
+      <input class="by" data-f="by" placeholder="ชื่อคนจอง" aria-label="ชื่อคนจอง" value="${esc(i.resv && i.resv.by || "")}" ${i.status === "reserved" ? "" : "hidden"}>
       <button class="btn small" type="button" data-act="save">บันทึก</button>
       <button class="btn danger small" type="button" data-act="del">${confirmDel === i.id ? "ยืนยันลบ?" : "ลบ"}</button>
     </div>
-  </div>`).join("") : `<div class="empty">ยังไม่มีของในร้าน เริ่มเพิ่มจากรูปทางซ้ายได้เลย</div>`;
+  </div>`).join("") : `<div class="empty">${TAB === "reserved" ? "ตอนนี้ไม่มีของติดจอง" : ITEMS.length ? "ไม่มีของในหมวดนี้" : "ยังไม่มีของในร้าน เริ่มเพิ่มจากรูปทางซ้ายได้เลย"}</div>`;
 }
+$("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) { TAB = b.dataset.tab; renderList(); } });
+$("#list").addEventListener("change", e => { if (e.target.dataset.f === "status") { const by = e.target.closest(".ctl").querySelector('[data-f="by"]'); by.hidden = e.target.value !== "reserved"; if (!by.hidden) by.focus(); } });
 $("#list").addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const row = b.closest(".li"), id = row.dataset.id;
   try {
+    if (b.dataset.act === "unresv" || b.dataset.act === "soldnow") {
+      const status = b.dataset.act === "unresv" ? "on" : "sold";
+      b.disabled = true; const r = await api({ key: KEY, action: "update", id, patch: { status, resv: null } });
+      ITEMS = ITEMS.map(i => i.id === id ? { ...i, ...r.item } : i); renderList();
+      say($("#list-status"), (status === "on" ? "ยกเลิกจองแล้ว " : "ขายแล้ว ") + fullName(r.item) + " ✓", "ok"); return;
+    }
+    if (b.dataset.act === "opts") {
+      const opts = OPTS.parse(row.querySelector('[data-f="opts"]').value).opts;
+      b.disabled = true; const r = await api({ key: KEY, action: "update", id, patch: { opts } });
+      ITEMS = ITEMS.map(i => i.id === id ? { ...i, ...r.item } : i); renderList(); say($("#list-status"), "บันทึกออปชันแล้ว (" + opts.length + " ออปชัน) ✓", "ok"); return;
+    }
     if (b.dataset.act === "del") {
       if (confirmDel !== id) { confirmDel = id; renderList(); return; }
       b.disabled = true; await api({ key: KEY, action: "delete", id });
       ITEMS = ITEMS.filter(i => i.id !== id); confirmDel = null; renderList(); say($("#list-status"), "ลบแล้ว ✓", "ok");
     } else {
       const patch = { status: row.querySelector('[data-f="status"]').value };
+      if (patch.status === "reserved") { const old = ITEMS.find(i => i.id === id); patch.resv = { by: row.querySelector('[data-f="by"]').value.trim(), at: old && old.status === "reserved" && old.resv ? old.resv.at : new Date().toISOString() }; }
       const pv = row.querySelector('[data-f="price"]').value.trim();
       if (pv) { const p = parsePrice(pv); if (!(p >= 0)) return say($("#list-status"), "ราคาไม่ถูกต้อง", "bad"); patch.price = p; }
       b.disabled = true; const r = await api({ key: KEY, action: "update", id, patch });
-      ITEMS = ITEMS.map(i => i.id === id ? r.item : i); renderList(); say($("#list-status"), "บันทึก " + fullName(r.item) + " แล้ว ✓", "ok");
+      ITEMS = ITEMS.map(i => i.id === id ? { ...i, ...r.item } : i); renderList(); say($("#list-status"), "บันทึก " + fullName(r.item) + " แล้ว ✓", "ok");
     }
   } catch (err) { b.disabled = false; say($("#list-status"), err.message, "bad"); }
 });

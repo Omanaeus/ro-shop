@@ -9,6 +9,26 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chonburi&family=Cinzel:wght@600;700&family=Kanit:wght@500;700&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+.sform{display:flex;gap:8px;flex:1 1 320px}
+.sform .search{flex:1 1 auto}
+#f-count:not(:empty){display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:99px;background:var(--gold);color:var(--parch-ink);font-size:13px;margin-left:4px;padding:0 6px}
+.fpanel{background:linear-gradient(180deg,var(--wood1),var(--wood2));border:1px solid #5a3d1a;border-radius:10px;padding:14px;margin:0 0 16px;box-shadow:inset 0 0 0 3px #150e09,inset 0 0 0 4px var(--frame)}
+.frow2{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,2fr) minmax(0,.7fr) auto;gap:10px;align-items:end}
+.frow2 label{display:grid;gap:4px;font-size:13px;color:var(--soft)}
+.frow2 select,.frow2 input{width:100%}
+.fchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.fchip{display:inline-flex;align-items:center;gap:6px;background:rgb(242 178 48/.15);border:1px solid var(--frame);color:var(--gold-ink);border-radius:999px;padding:4px 6px 4px 12px;font-size:14px}
+.fchip button{background:none;border:0;color:var(--ink);font-size:18px;cursor:pointer;min-width:30px;min-height:30px}
+.fhint{font-size:13px;color:var(--soft);margin:10px 0 0}
+.opts{grid-column:1/-1;list-style:none;margin:8px 0 0;padding:8px 10px;border-radius:8px;background:rgb(0 0 0/.25);border:1px solid #3a2a1c;display:grid;gap:2px;font-size:14px}
+.opts li{color:#e6dcc4}
+.opts li.hit{color:var(--gold-ink);font-weight:600}
+.tag.resv{background:rgb(242 178 48/.2);color:var(--gold-ink);border:1px solid var(--frame)}
+.item.resv{box-shadow:inset 0 0 0 3px #150e09,inset 0 0 0 4px #e09a1c,0 6px 16px rgb(0 0 0/.35)}
+.btn.queue{background:transparent;border:1.5px solid var(--frame);color:var(--gold-ink);box-shadow:none}
+@media(max-width:700px){.frow2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.frow2 label:nth-child(2){grid-column:1/-1;grid-row:1}}
+</style>
 </head>
 <body>
 <header class="band hero">
@@ -20,6 +40,7 @@
       </div>
       <p>เลือกดูแล้วกด "สนใจ" ระบบจะเตรียมข้อความให้ก๊อปไปทักได้เลย</p>
       <div class="meta"><span id="m-count">กำลังโหลด…</span><span id="m-upd"></span></div>
+      <a class="btn calc-link" href="../ro-calc/">คำนวณราคาอาวุธ/เกราะ →</a>
     </div>
     <div class="scene" aria-hidden="true">
       <svg viewBox="0 0 600 320" preserveAspectRatio="xMidYMax meet">
@@ -68,7 +89,11 @@
   <div class="wrap">
     <div class="tools">
       <label for="q" class="vh">ค้นหาไอเทม</label>
-      <input id="q" class="search" type="search" placeholder="ค้นหาชื่อไอเทม เช่น Card, Oridecon">
+      <form class="sform" id="sform" role="search">
+        <input id="q" class="search" type="search" placeholder="ค้นหาชื่อไอเทมหรือออปชัน เช่น Stunner, ASPD">
+        <button class="btn" type="submit">ค้นหา</button>
+      </form>
+      <button class="btn ghost" id="f-toggle" type="button" aria-expanded="false" aria-controls="fpanel">กรองออปชัน <span id="f-count"></span></button>
       <label for="sort" class="vh">เรียงลำดับ</label>
       <select id="sort">
         <option value="new">ลงล่าสุด</option>
@@ -77,6 +102,16 @@
         <option value="az">ชื่อ A–Z</option>
       </select>
       <label style="display:flex;gap:8px;align-items:center;min-height:44px;font-size:15px"><input id="avail" type="checkbox" style="width:20px;height:20px;min-height:0"> เฉพาะที่ยังมีของ</label>
+    </div>
+    <div class="fpanel" id="fpanel" hidden>
+      <div class="frow2">
+        <label>ประเภท<select id="ft"></select></label>
+        <label>ออปชัน<select id="fo"></select></label>
+        <label>ค่าขั้นต่ำ<input id="fv" type="number" min="0" inputmode="decimal" placeholder="เช่น 30"></label>
+        <button class="btn" id="f-add" type="button">+ เพิ่มเงื่อนไข</button>
+      </div>
+      <div class="fchips" id="fchips"></div>
+      <p class="fhint">ต้องมีครบทุกเงื่อนไข · ค่าขั้นต่ำเว้นว่างได้</p>
     </div>
     <div class="chips" id="chips" role="group" aria-label="หมวดหมู่"></div>
     <p class="count" id="count"></p>
@@ -96,7 +131,7 @@
         <li><b>เวลาออนไลน์</b> <span id="c-time"></span></li>
       </ul>
     </div>
-    <div><h2>เงื่อนไข</h2><p>ซื้อหลายชิ้นต่อรองได้ ไอเทมที่ขึ้นว่า "ขายแล้ว" จะถูกเอาออกเร็ว ๆ นี้</p></div>
+    <div><h2>เงื่อนไข</h2><p>ซื้อหลายชิ้นต่อรองได้ ของที่ขึ้นว่า "ติดจอง" กด "ต่อคิว" ไว้ได้ ถ้าคนจองเปลี่ยนใจจะทักกลับตามคิว ไอเทมที่ขึ้นว่า "ขายแล้ว" จะถูกเอาออกเร็ว ๆ นี้</p></div>
   </div>
 </section>
 
@@ -119,22 +154,28 @@
 
 <script src="config.js"></script>
 <script src="common.js"></script>
+<script src="affixes.js"></script>
+<script src="calc-core.js"></script>
+<script src="opts.js"></script>
 <script>
 {
 const { CATS, ICON, esc, fmt, fullName, catName, safeImg, api } = RO;
 const SAMPLE = {
   shop: { name: "ร้านไอเทม", ign: "Merchant01", line: "ro.shop", fb: "facebook.com/ro.shop", time: "ทุกวัน 20:00–24:00" },
   items: [
+    { id: "12", name: "Stunner", cat: "weapon", refine: 7, price: 90000000, cur: "z", qty: 1, status: "on", opts: [{ n: "Physical Damage to Fire enemies (%)", v: 40, t: "forge" }, { n: "ASPD", v: 3, t: "forge" }, { n: "MaxHP(MHP)", v: 210, t: "forge" }] },
+    { id: "11", name: "Two-Handed Axe", cat: "weapon", price: 25000000, cur: "z", qty: 1, status: "reserved", opts: [{ n: "ATK", v: 54, t: "forge" }, { n: "ASPD", v: 3, t: "forge" }] },
     { id: "10", name: "Andre Card", cat: "card", price: 450000, cur: "z", qty: 1, status: "on", note: "ATK +20" },
-    { id: "9", name: "Blade [4]", cat: "weapon", refine: 7, price: 120000, cur: "z", qty: 1, status: "on" },
-    { id: "8", name: "Muffler [1]", cat: "armor", refine: 4, price: 95000, cur: "z", qty: 1, status: "on" },
+    { id: "9", name: "Saber", cat: "weapon", price: 1200, cur: "฿", qty: 1, status: "on", opts: [{ n: "Physical Damage to Neutral enemies (%)", v: 30, t: "forge" }, { n: "Phys Damage to Medium targets (%)", v: 30, t: "forge" }, { n: "MaxSP(MSP)", v: 80, t: "forge" }] },
+    { id: "8", name: "Muffler [1]", cat: "armor", refine: 4, price: 95000, cur: "z", qty: 1, status: "on", opts: [{ n: "MaxHP (%)", v: 4, t: "garment" }, { n: "Fire resistance increase (%)", v: 5, t: "garment" }, { n: "Resistance to Demi-Human (%)", v: 6, t: "garment" }] },
     { id: "7", name: "Oridecon", cat: "mat", price: 22000, cur: "z", qty: 15, status: "on", note: "ราคาต่อชิ้น" },
     { id: "6", name: "White Potion", cat: "use", price: 1100, cur: "z", qty: 200, status: "on", note: "ขั้นต่ำ 50 ขวด" },
     { id: "5", name: "Thief Clothes [1]", cat: "armor", price: 80000, cur: "z", qty: 1, status: "sold" }
   ]
 };
 const $ = s => document.querySelector(s);
-let ITEMS = [], SHOP = {}, cat = "all";
+let ITEMS = [], SHOP = {}, cat = "all", FILTERS = [];
+const CAT_OPT = OPTS.catalog();
 
 $("#chips").innerHTML = [["all", "ทั้งหมด"], ...CATS].map(([k, l]) => `<button type="button" class="chip" data-c="${k}" aria-pressed="${k === cat}">${l}</button>`).join("");
 
@@ -144,27 +185,54 @@ function fill(data) {
   if (SHOP.name) { $("#shop-name").textContent = SHOP.name; document.title = SHOP.name; }
   $("#c-ign").textContent = SHOP.ign || "–"; $("#c-line").textContent = SHOP.line || "–";
   $("#c-fb").textContent = SHOP.fb || "–"; $("#c-time").textContent = SHOP.time || "–";
-  $("#m-count").textContent = ITEMS.filter(i => i.status === "on").length + " รายการพร้อมขาย";
+  const nr = ITEMS.filter(i => i.status === "reserved").length;
+  $("#m-count").textContent = ITEMS.filter(i => i.status === "on").length + " รายการพร้อมขาย" + (nr ? " · ติดจอง " + nr : "");
   const last = ITEMS.map(i => i.added).filter(Boolean).sort().pop();
   $("#m-upd").textContent = last ? "อัปเดต " + new Date(last).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" }) : "";
   $("#m-upd").hidden = !last;
   render();
 }
 
+/* ---------- ตัวกรองออปชัน ---------- */
+function fillOptSelect() {
+  const t = $("#ft").value, groups = CAT_OPT.filter(g => !t || g.t === t);
+  const seen = new Set();
+  $("#fo").innerHTML = groups.map(g => `<optgroup label="${esc(g.label)}">` + g.names.filter(n => t || !seen.has(n) && seen.add(n)).map(n => `<option value="${esc(n)}">${esc(OPTS.short(n))}</option>`).join("") + `</optgroup>`).join("");
+}
+$("#ft").innerHTML = `<option value="">ทั้งหมด</option>` + CAT_OPT.map(g => `<option value="${g.t}">${esc(g.label)}</option>`).join("");
+fillOptSelect();
+$("#ft").addEventListener("change", fillOptSelect);
+function renderFilters() {
+  $("#fchips").innerHTML = FILTERS.map((f, k) => `<span class="fchip">${esc(OPTS.short(f.n))}${f.min ? " ≥ " + esc(f.min) : ""}<button type="button" data-rm="${k}" aria-label="เอาเงื่อนไขนี้ออก">×</button></span>`).join("") +
+    (FILTERS.length ? `<button class="btn ghost small" id="f-clear" type="button">ล้างตัวกรอง</button>` : "");
+  $("#f-count").textContent = FILTERS.length || "";
+  render();
+}
+$("#f-add").addEventListener("click", () => { const n = $("#fo").value; if (!n) return; const min = Number($("#fv").value) || 0; FILTERS = FILTERS.filter(f => f.n !== n).concat({ n, min }); $("#fv").value = ""; renderFilters(); });
+$("#fv").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("#f-add").click(); } });
+$("#fchips").addEventListener("click", e => { if (e.target.id === "f-clear") { FILTERS = []; return renderFilters(); } const b = e.target.closest("[data-rm]"); if (b) { FILTERS.splice(Number(b.dataset.rm), 1); renderFilters(); } });
+$("#f-toggle").addEventListener("click", () => { const p = $("#fpanel"), open = p.hidden; p.hidden = !open; $("#f-toggle").setAttribute("aria-expanded", open); if (open) $("#fo").focus(); });
+const optMatch = (i, f) => (i.opts || []).some(o => o.n === f.n && Number(o.v) >= f.min);
+const optText = i => (i.opts || []).map(OPTS.fmt).join(" ");
+$("#sform").addEventListener("submit", e => { e.preventDefault(); render(); $("#count").scrollIntoView({ behavior: "smooth", block: "start" }); });
+
+const RANK = { on: 0, reserved: 1, sold: 2 };
 function render() {
   const q = $("#q").value.trim().toLowerCase(), av = $("#avail").checked, s = $("#sort").value;
-  const list = ITEMS.filter(i => (cat === "all" || i.cat === cat) && (!av || i.status === "on") && (!q || (i.name + " " + (i.note || "")).toLowerCase().includes(q)));
-  list.sort((a, b) => (a.status === "sold") - (b.status === "sold") || (s === "lo" ? a.price - b.price : s === "hi" ? b.price - a.price : s === "az" ? a.name.localeCompare(b.name) : (Number(b.id) || 0) - (Number(a.id) || 0)));
-  $("#count").textContent = "แสดง " + list.length + " จาก " + ITEMS.length + " รายการ";
+  const list = ITEMS.filter(i => (cat === "all" || i.cat === cat) && (!av || i.status === "on") && (!q || (i.name + " " + (i.note || "") + " " + optText(i)).toLowerCase().includes(q)) && FILTERS.every(f => optMatch(i, f)));
+  list.sort((a, b) => (RANK[a.status] ?? 0) - (RANK[b.status] ?? 0) || (s === "lo" ? a.price - b.price : s === "hi" ? b.price - a.price : s === "az" ? a.name.localeCompare(b.name) : (Number(b.id) || 0) - (Number(a.id) || 0)));
+  $("#count").textContent = "แสดง " + list.length + " จาก " + ITEMS.length + " รายการ" + (FILTERS.length ? " · กรองออปชัน " + FILTERS.length + " เงื่อนไข" : "");
   $("#grid").innerHTML = list.length ? list.map(i => {
-    const sold = i.status === "sold", img = safeImg(i.image);
-    return `<article class="item${sold ? " sold" : ""}">
+    const sold = i.status === "sold", resv = i.status === "reserved", img = safeImg(i.image);
+    const ops = (i.opts || []).length ? `<ul class="opts">${i.opts.map(o => `<li class="${FILTERS.some(f => f.n === o.n) ? "hit" : ""}">${esc(OPTS.fmt(o))}</li>`).join("")}</ul>` : "";
+    return `<article class="item${sold ? " sold" : ""}${resv ? " resv" : ""}">
       <div class="ico">${ICON[i.cat] || ICON.use}</div>
       <h3>${esc(fullName(i))}</h3>
       <div class="sub">${esc(catName(i.cat))} · มี ${esc(i.qty)} ชิ้น</div>
+      ${ops}
       ${i.note ? `<p class="note">${esc(i.note)}</p>` : ""}
       ${img ? `<img class="shot" src="${esc(img)}" alt="รูปไอเทม ${esc(i.name)}" loading="lazy" data-zoom="${esc(img)}">` : ""}
-      <div class="row"><span class="price">${esc(fmt(i.price, i.cur))}</span>${sold ? '<span class="tag">ขายแล้ว</span>' : `<button class="btn" type="button" data-id="${esc(i.id)}">สนใจ</button>`}</div>
+      <div class="row"><span class="price">${esc(fmt(i.price, i.cur))}</span>${sold ? '<span class="tag">ขายแล้ว</span>' : resv ? `<span class="tag resv">ติดจอง</span><button class="btn queue" type="button" data-id="${esc(i.id)}">ต่อคิว</button>` : `<button class="btn" type="button" data-id="${esc(i.id)}">สนใจ</button>`}</div>
     </article>`;
   }).join("") : `<div class="empty">${ITEMS.length ? "ไม่พบไอเทมที่ค้นหา ลองเปลี่ยนคำค้นหรือหมวดดูครับ" : "ตอนนี้ยังไม่มีของวางขาย แวะมาใหม่นะครับ"}</div>`;
 }
@@ -173,13 +241,15 @@ const dlg = $("#dlg"), zoom = $("#zoom"); let lastFocus = null;
 function openBuy(id) {
   const i = ITEMS.find(x => x.id === id); if (!i) return; lastFocus = document.activeElement;
   $("#d-title").textContent = fullName(i); $("#d-price").textContent = fmt(i.price, i.cur);
-  $("#d-msg").value = `สวัสดีครับ สนใจ ${fullName(i)} ราคา ${fmt(i.price, i.cur)} ยังมีอยู่ไหมครับ สะดวกเทรดตอนไหนครับ`;
+  $("#d-msg").value = i.status === "reserved"
+    ? `สวัสดีครับ สนใจ ${fullName(i)} ราคา ${fmt(i.price, i.cur)} ที่ติดจองอยู่ ถ้าคนจองเปลี่ยนใจ ขอต่อคิวด้วยครับ`
+    : `สวัสดีครับ สนใจ ${fullName(i)} ราคา ${fmt(i.price, i.cur)} ยังมีอยู่ไหมครับ สะดวกเทรดตอนไหนครับ` + ((i.opts || []).length ? ` (${i.opts.map(OPTS.fmt).join(", ")})` : "");
   $("#d-line").textContent = SHOP.line || "–"; $("#d-ign").textContent = SHOP.ign || "–"; $("#d-copy").textContent = "ก๊อปข้อความ";
   dlg.classList.add("open"); $("#d-copy").focus();
 }
 function closeAll() { dlg.classList.remove("open"); zoom.classList.remove("open"); lastFocus && lastFocus.focus(); }
 
-$("#chips").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; cat = b.dataset.c; document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", c === b)); render(); });
+$("#chips").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; cat = b.dataset.c; document.querySelectorAll("#chips .chip").forEach(c => c.setAttribute("aria-pressed", c === b)); render(); });
 $("#grid").addEventListener("click", e => {
   const b = e.target.closest("[data-id]"); if (b) return openBuy(b.dataset.id);
   const z = e.target.closest("[data-zoom]"); if (z) { lastFocus = z; $("#zoom-img").src = z.dataset.zoom; zoom.classList.add("open"); }
