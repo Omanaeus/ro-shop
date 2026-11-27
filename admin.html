@@ -37,6 +37,7 @@
 .li.resv-row{border-color:#b8893c;box-shadow:inset 3px 0 0 #f2b230}
 .rv{grid-column:2/-1;font-size:13px;color:var(--gold-ink);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .ctl .by{width:9em}
+.qty input.changed{border-color:var(--gold)}
 .raw{font-size:13px;color:var(--soft);margin-top:10px}
 .raw pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;max-height:160px;overflow:auto}
 .list{display:grid;gap:10px}
@@ -46,6 +47,9 @@
 .li .nm{font-weight:600}
 .li .pr{color:var(--gold-ink);font-family:Kanit,sans-serif;white-space:nowrap}
 .li .ctl{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.qty{display:inline-flex;align-items:center;gap:2px}
+.qty input{width:4.5em!important;text-align:center}
+.qty .btn{min-width:36px;padding:6px 0}
 .li .ctl input{width:8.5em;min-height:36px;padding:6px 10px}
 .li .ctl select{min-height:36px;padding:6px 10px}
 .li.hidden-row{opacity:.55}
@@ -261,6 +265,7 @@ function renderList() {
     <div class="ctl">
       <label class="vh" for="p-${esc(i.id)}">ราคาใหม่</label>
       <input id="p-${esc(i.id)}" data-f="price" placeholder="ราคาใหม่" inputmode="decimal">
+      <span class="qty"><button class="btn ghost small" type="button" data-q="-1" aria-label="ลดจำนวน">−</button><label class="vh" for="q-${esc(i.id)}">จำนวนที่เหลือ</label><input id="q-${esc(i.id)}" data-f="qty" type="number" min="0" inputmode="numeric" value="${esc(i.qty)}" title="จำนวนที่เหลือ"><button class="btn ghost small" type="button" data-q="1" aria-label="เพิ่มจำนวน">+</button></span>
       <label class="vh" for="s-${esc(i.id)}">สถานะ</label>
       <select id="s-${esc(i.id)}" data-f="status">${ST.map(([v, l]) => `<option value="${v}"${i.status === v ? " selected" : ""}>${l}</option>`).join("")}</select>
       <input class="by" data-f="by" placeholder="ชื่อคนจอง" aria-label="ชื่อคนจอง" value="${esc(i.resv && i.resv.by || "")}" ${i.status === "reserved" ? "" : "hidden"}>
@@ -272,6 +277,8 @@ function renderList() {
 $("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) { TAB = b.dataset.tab; renderList(); } });
 $("#list").addEventListener("change", e => { if (e.target.dataset.f === "status") { const by = e.target.closest(".ctl").querySelector('[data-f="by"]'); by.hidden = e.target.value !== "reserved"; if (!by.hidden) by.focus(); } });
 $("#list").addEventListener("click", async e => {
+  const qb = e.target.closest("[data-q]");
+  if (qb) { const inp = qb.parentElement.querySelector('[data-f="qty"]'); inp.value = Math.max(0, (Number(inp.value) || 0) + Number(qb.dataset.q)); inp.classList.add("changed"); return; }
   const b = e.target.closest("[data-act]"); if (!b) return;
   const row = b.closest(".li"), id = row.dataset.id;
   try {
@@ -292,6 +299,8 @@ $("#list").addEventListener("click", async e => {
       ITEMS = ITEMS.filter(i => i.id !== id); confirmDel = null; renderList(); say($("#list-status"), "ลบแล้ว ✓", "ok");
     } else {
       const patch = { status: row.querySelector('[data-f="status"]').value };
+      const qv = row.querySelector('[data-f="qty"]').value;
+      if (qv !== "") { patch.qty = Math.max(0, parseInt(qv, 10) || 0); if (patch.qty === 0 && patch.status === "on") patch.status = "sold"; } // ของหมด = ขายแล้ว
       if (patch.status === "reserved") { const old = ITEMS.find(i => i.id === id); patch.resv = { by: row.querySelector('[data-f="by"]').value.trim(), at: old && old.status === "reserved" && old.resv ? old.resv.at : new Date().toISOString() }; }
       const pv = row.querySelector('[data-f="price"]').value.trim();
       if (pv) { const p = parsePrice(pv); if (!(p >= 0)) return say($("#list-status"), "ราคาไม่ถูกต้อง", "bad"); patch.price = p; }

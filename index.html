@@ -24,6 +24,13 @@
 .opts{grid-column:1/-1;list-style:none;margin:8px 0 0;padding:8px 10px;border-radius:8px;background:rgb(0 0 0/.25);border:1px solid #3a2a1c;display:grid;gap:2px;font-size:14px}
 .opts li{color:#e6dcc4}
 .opts li.hit{color:var(--gold-ink);font-weight:600}
+.item{position:relative}
+.stock{position:absolute;top:12px;right:12px;display:grid;justify-items:center;min-width:58px;padding:4px 10px 5px;border-radius:10px;background:#150e09;border:1.5px solid var(--frame);box-shadow:0 0 10px rgb(242 178 48/.2);line-height:1.1}
+.stock b{font-family:Kanit,sans-serif;font-size:19px;color:var(--gold-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.stock small{font-size:11px;color:var(--soft)}
+.stock.low{border-color:#e07a1c}.stock.low b{color:#ffb070}
+.stock.out{border-color:var(--sold)}.stock.out b{color:var(--soft)}
+.item.has-stock h3,.item.has-stock .sub{padding-right:70px}
 .tag.resv{background:rgb(242 178 48/.2);color:var(--gold-ink);border:1px solid var(--frame)}
 .item.resv{box-shadow:inset 0 0 0 3px #150e09,inset 0 0 0 4px #e09a1c,0 6px 16px rgb(0 0 0/.35)}
 .btn.queue{background:transparent;border:1.5px solid var(--frame);color:var(--gold-ink);box-shadow:none}
@@ -224,10 +231,11 @@ function render() {
   $("#grid").innerHTML = list.length ? list.map(i => {
     const sold = i.status === "sold", resv = i.status === "reserved", img = safeImg(i.image);
     const ops = (i.opts || []).length ? `<ul class="opts">${i.opts.map(o => `<li class="${FILTERS.some(f => f.n === o.n) ? "hit" : ""}">${esc(OPTS.fmt(o))}</li>`).join("")}</ul>` : "";
-    return `<article class="item${sold ? " sold" : ""}${resv ? " resv" : ""}">
+    const st = i.cat === "mat" ? (() => { const q = Number(i.qty) || 0, cls = q <= 0 || sold ? "out" : q <= 10 ? "low" : ""; return `<div class="stock ${cls}" aria-label="เหลือ ${q} ชิ้น"><small>เหลือ</small><b>${q > 0 && !sold ? esc(q.toLocaleString("en-US")) : "หมด"}</b><small>${q > 0 && !sold ? "ชิ้น" : ""}</small></div>`; })() : "";
+    return `<article class="item${sold ? " sold" : ""}${resv ? " resv" : ""}${st ? " has-stock" : ""}">${st}
       <div class="ico">${ICON[i.cat] || ICON.use}</div>
       <h3>${esc(fullName(i))}</h3>
-      <div class="sub">${esc(catName(i.cat))} · มี ${esc(i.qty)} ชิ้น</div>
+      <div class="sub">${esc(catName(i.cat))}${i.cat === "mat" ? "" : " · มี " + esc(i.qty) + " ชิ้น"}</div>
       ${ops}
       ${i.note ? `<p class="note">${esc(i.note)}</p>` : ""}
       ${img ? `<img class="shot" src="${esc(img)}" alt="รูปไอเทม ${esc(i.name)}" loading="lazy" data-zoom="${esc(img)}">` : ""}
